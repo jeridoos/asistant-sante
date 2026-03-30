@@ -1,7 +1,1 @@
-flask
-pandas
-numpy
-scikit-learn
-joblib
-apscheduler
-requests
+-e "flask\npandas\nnumpy\nscikit-learn\njoblib\napscheduler\nrequests" 
