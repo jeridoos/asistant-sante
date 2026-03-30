@@ -4,9 +4,11 @@ import pandas as pd
 import os
 
 # Chemins vers les fichiers (à adapter si nécessaire)
-model_path = r'C:\Users\Administrateur\Desktop\healthcare\adherence_model.pkl'
-scaler_path = r'C:\Users\Administrateur\Desktop\healthcare\scaler.pkl'
-
+base_dir = os.path.dirname(__file__)
+model_path = os.path.join(base_dir, 'adherence_model.pkl')
+scaler_path = os.path.join(base_dir, 'scaler.pkl')
+model = joblib.load(model_path)
+scaler = joblib.load(scaler_path)
 # Charger le modèle et le scaler
 model = joblib.load(model_path)
 scaler = joblib.load(scaler_path)
