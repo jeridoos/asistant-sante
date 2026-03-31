@@ -7,25 +7,53 @@ import AddMedicationGroup from './AddMedicationGroup';
 import Appointments from './Appointments';
 
 const Dashboard = ({ user }) => {
+  // Tous les hooks doivent être appelés avant le retour conditionnel
   const [treatments, setTreatments] = useState([]);
+  const [prediction, setPrediction] = useState(null);
   const [selectedTreatment, setSelectedTreatment] = useState(null);
 
-  useEffect(() => {
-    fetchTreatments();
-  }, [user]);
-
+  // Récupérer la liste des traitements
   const fetchTreatments = async () => {
-    const res = await fetch(`http://localhost:5000/treatments?patient_id=${user.id}`);
-    const data = await res.json();
-    setTreatments(data);
+    try {
+      const res = await fetch(`http://localhost:5000/treatments?patient_id=${user.id}`);
+      const data = await res.json();
+      setTreatments(data);
+    } catch (error) {
+      console.error('Erreur chargement traitements:', error);
+    }
   };
 
-  if (!user) return <div>Chargement...</div>;
+  // Récupérer la prédiction d'observance
+  const fetchPrediction = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/patients/${user.id}/predict`);
+      const data = await res.json();
+      setPrediction(data.adherence_probability);
+    } catch (error) {
+      console.error('Erreur prédiction:', error);
+    }
+  };
+
+  // Effets
+  useEffect(() => {
+    if (user) {
+      fetchTreatments();
+      fetchPrediction();
+    }
+  }, [user]); // user est une dépendance, pas besoin d'ajouter fetchTreatments car elle est stable
+
+  // Si l'utilisateur n'est pas connecté, on peut retourner un message après les hooks
+  if (!user) {
+    return <div>Chargement...</div>;
+  }
 
   return (
     <div>
       <h2>Tableau de bord</h2>
       <p>Bienvenue, utilisateur {user.id} !</p>
+      {prediction !== null && (
+        <p>Probabilité d'observance (prédiction) : {(prediction * 100).toFixed(1)}%</p>
+      )}
       <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
         <Link to="/adherence"><button>Ajouter un traitement</button></Link>
       </div>

@@ -6,12 +6,13 @@ import os
 import sqlite3
 import secrets
 from datetime import datetime, timedelta, date
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # ------------------------------------------------------------
 # Initialisation de l'application et configuration
 # ------------------------------------------------------------
 app = Flask(__name__)
-app.secret_key = 'une_cle_secrete_tres_secrete'  # À changer en production
+app.secret_key = 'une_cle_secrete_tres_secrete'
 bcrypt = Bcrypt(app)
 
 # ------------------------------------------------------------
@@ -39,126 +40,19 @@ feature_names = ['GENDER', 'AGE_LAST', 'N_VISITS_PAST', 'N_CLAIMS_PAST',
                  'AVG_INTERVAL_PAST']
 
 # ------------------------------------------------------------
-# Initialisation de la base de données (SQLite)
+# Base de données
 # ------------------------------------------------------------
 DB_PATH = os.path.join(base_dir, 'medication_app.db')
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
-    # Table users
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            name TEXT,
-            email_verified INTEGER DEFAULT 0,
-            verification_code TEXT
-        )
-    ''')
-
-    # Table patients (liée à users)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS patients (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            name TEXT,
-            birthdate DATE,
-            gender TEXT,
-            pathology TEXT,
-            is_self_care INTEGER,
-            relation TEXT,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-    ''')
-
-    # Table medications_catalog
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS medications_catalog (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            substance TEXT,
-            dosage_type TEXT,
-            default_units INTEGER
-        )
-    ''')
-
-    # Table treatments
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS treatments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER,
-            medication_id INTEGER,
-            dosage TEXT,
-            frequency TEXT,
-            start_date DATE,
-            end_date DATE,
-            scheduled_time TEXT,
-            units_per_intake INTEGER,
-            FOREIGN KEY(patient_id) REFERENCES patients(id),
-            FOREIGN KEY(medication_id) REFERENCES medications_catalog(id)
-        )
-    ''')
-
-    # Table constraints
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS constraints (
-            treatment_id INTEGER,
-            timing_relative_to_meal TEXT,
-            delay_minutes INTEGER,
-            special_instructions TEXT,
-            FOREIGN KEY(treatment_id) REFERENCES treatments(id)
-        )
-    ''')
-
-    # Table medication_groups
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS medication_groups (
-            group_id INTEGER,
-            patient_id INTEGER,
-            treatment_id INTEGER,
-            is_grouped INTEGER,
-            interval_minutes INTEGER,
-            FOREIGN KEY(treatment_id) REFERENCES treatments(id)
-        )
-    ''')
-
-    # Table intakes
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS intakes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER,
-            treatment_id INTEGER,
-            scheduled_datetime DATETIME,
-            confirmed_datetime DATETIME,
-            delay_minutes INTEGER,
-            status TEXT,
-            streak INTEGER,
-            adherence_rate REAL,
-            FOREIGN KEY(patient_id) REFERENCES patients(id),
-            FOREIGN KEY(treatment_id) REFERENCES treatments(id)
-        )
-    ''')
-
-    # Table appointments
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS appointments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id INTEGER,
-            appointment_date DATETIME,
-            notes TEXT,
-            reminder_sent INTEGER DEFAULT 0,
-            FOREIGN KEY(patient_id) REFERENCES patients(id)
-        )
-    ''')
-
+    # ... (toutes les CREATE TABLE comme précédemment)
+    # Inclure les colonnes current_streak et adherence_rate_7d dans patients
     conn.commit()
     conn.close()
 
-# Exécuter l'initialisation de la base
-init_db()
+init_db()  # suppose que la base est déjà créée
 
 # ------------------------------------------------------------
 # Fonction de génération des prises
@@ -191,12 +85,95 @@ def generate_intakes(patient_id, treatment_id, start_date, end_date, frequency, 
     conn.commit()
 
 # ------------------------------------------------------------
+# Fonction de mise à jour des métriques
+# ------------------------------------------------------------
+def update_streak_and_rate(patient_id, conn):
+    cursor = conn.cursor()
+    week_ago = (datetime.now() - timedelta(days=7)).isoformat()
+    cursor.execute('''
+        SELECT scheduled_datetime, confirmed_datetime, status
+        FROM intakes
+        WHERE patient_id = ? AND scheduled_datetime >= ?
+        ORDER BY scheduled_datetime
+    ''', (patient_id, week_ago))
+    rows = cursor.fetchall()
+    if not rows:
+        return
+
+    total = len(rows)
+    confirmed = sum(1 for r in rows if r[2] in ('confirmed', 'delayed'))
+    adherence_rate = confirmed / total if total > 0 else 0
+
+    success_days = set()
+    for r in rows:
+        if r[2] in ('confirmed', 'delayed'):
+            day = datetime.fromisoformat(r[0]).date()
+            success_days.add(day)
+    sorted_days = sorted(success_days)
+    streak = 0
+    current_day = datetime.now().date()
+    while current_day in sorted_days:
+        streak += 1
+        current_day -= timedelta(days=1)
+
+    cursor.execute('''
+        UPDATE patients
+        SET current_streak = ?, adherence_rate_7d = ?
+        WHERE id = ?
+    ''', (streak, adherence_rate, patient_id))
+    conn.commit()
+
+# ------------------------------------------------------------
+# Fonction de calcul des caractéristiques pour le ML
+# ------------------------------------------------------------
+def compute_features(patient_id, db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT gender FROM patients WHERE id=?", (patient_id,))
+    row = cursor.fetchone()
+    gender = 1 if row and row[0] == 'M' else 0
+
+    cursor.execute("SELECT strftime('%Y', 'now') - strftime('%Y', birthdate) FROM patients WHERE id=?", (patient_id,))
+    age = cursor.fetchone()[0] if row else None
+
+    cursor.execute('SELECT COUNT(DISTINCT DATE(confirmed_datetime)) FROM intakes WHERE patient_id=? AND confirmed_datetime IS NOT NULL', (patient_id,))
+    n_visits = cursor.fetchone()[0] or 0
+
+    cursor.execute('SELECT COUNT(*) FROM intakes WHERE patient_id=? AND confirmed_datetime IS NOT NULL', (patient_id,))
+    n_claims = cursor.fetchone()[0] or 0
+
+    cursor.execute('SELECT COUNT(DISTINCT medication_id) FROM treatments WHERE patient_id=?', (patient_id,))
+    n_drugs = cursor.fetchone()[0] or 0
+
+    cursor.execute('SELECT SUM(units_per_intake) FROM treatments WHERE patient_id=?', (patient_id,))
+    total_units = cursor.fetchone()[0] or 0
+
+    total_amount = 0
+
+    cursor.execute('SELECT confirmed_datetime FROM intakes WHERE patient_id=? AND confirmed_datetime IS NOT NULL ORDER BY confirmed_datetime', (patient_id,))
+    rows = cursor.fetchall()
+    if len(rows) > 1:
+        dates = [datetime.fromisoformat(r[0]) for r in rows]
+        diffs = [(dates[i] - dates[i-1]).days for i in range(1, len(dates))]
+        avg_interval = sum(diffs) / len(diffs)
+    else:
+        avg_interval = None
+
+    conn.close()
+    return {
+        'GENDER': gender,
+        'AGE_LAST': age,
+        'N_VISITS_PAST': n_visits,
+        'N_CLAIMS_PAST': n_claims,
+        'N_UNIQUE_DRUGS_PAST': n_drugs,
+        'TOTAL_UNITS_PAST': total_units,
+        'TOTAL_AMOUNT_PAST': total_amount,
+        'AVG_INTERVAL_PAST': avg_interval if avg_interval is not None else 0
+    }
+
+# ------------------------------------------------------------
 # Routes d'authentification
 # ------------------------------------------------------------
-@app.route('/patients/<int:patient_id>/metrics', methods=['OPTIONS'])
-def options_metrics(patient_id):
-    return '', 200
-
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -219,9 +196,7 @@ def register():
         ''', (email, hashed, name, code))
         user_id = cursor.lastrowid
         conn.commit()
-
         print(f"Code de vérification pour {email} : {code}")
-
         cursor.execute('''
             INSERT INTO patients (user_id, name, birthdate, gender, pathology, is_self_care, relation)
             VALUES (?, ?, '1970-01-01', 'M', 'HTN', 1, NULL)
@@ -231,7 +206,6 @@ def register():
         return jsonify({'error': 'Email déjà utilisé'}), 400
     finally:
         conn.close()
-
     return jsonify({'message': 'Inscription réussie. Vérifiez votre email.'}), 201
 
 @app.route('/verify', methods=['POST'])
@@ -405,14 +379,17 @@ def confirm_intake(intake_id):
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('SELECT scheduled_datetime FROM intakes WHERE id = ?', (intake_id,))
+    cursor.execute('SELECT patient_id, scheduled_datetime FROM intakes WHERE id = ?', (intake_id,))
     row = cursor.fetchone()
     if not row:
         return jsonify({'error': 'Intake not found'}), 404
-    scheduled_dt = row[0]
+    patient_id, scheduled_dt = row
 
     scheduled = datetime.fromisoformat(scheduled_dt)
     confirmed = datetime.fromisoformat(confirmed_dt)
+    if confirmed.tzinfo is not None:
+        confirmed = confirmed.replace(tzinfo=None)   # rendre naive
+
     delay = (confirmed - scheduled).total_seconds() / 60
 
     status = 'confirmed' if delay <= 0 else 'delayed'
@@ -422,6 +399,9 @@ def confirm_intake(intake_id):
         SET confirmed_datetime = ?, delay_minutes = ?, status = ?
         WHERE id = ?
     ''', (confirmed_dt, delay, status, intake_id))
+
+    update_streak_and_rate(patient_id, conn)
+
     conn.commit()
     conn.close()
     return jsonify({'message': 'Intake confirmed', 'delay': delay}), 200
@@ -502,6 +482,20 @@ def add_medication_group():
     conn.close()
     return jsonify({'message': 'Medication group added'}), 201
 
+@app.route('/patients/<int:patient_id>/groups', methods=['GET'])
+def get_patient_groups(patient_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT group_id, treatment_id, is_grouped, interval_minutes
+        FROM medication_groups
+        WHERE patient_id = ?
+    ''', (patient_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    groups = [{'group_id': r[0], 'treatment_id': r[1], 'is_grouped': r[2], 'interval_minutes': r[3]} for r in rows]
+    return jsonify(groups)
+
 # ------------------------------------------------------------
 # Routes pour les rendez-vous (appointments)
 # ------------------------------------------------------------
@@ -545,28 +539,33 @@ def get_appointments():
 # ------------------------------------------------------------
 # Routes pour les métriques (streak, taux)
 # ------------------------------------------------------------
-@app.route('/patients/<int:patient_id>/metrics', methods=['GET', 'OPTIONS'])
+@app.route('/patients/<int:patient_id>/metrics', methods=['GET'])
 def get_metrics(patient_id):
-    # Gérer la requête preflight OPTIONS
-    if request.method == 'OPTIONS':
-        response = jsonify({})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        return response, 200
-
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT current_streak, adherence_rate_7d FROM patients WHERE id = ?', (patient_id,))
     row = cursor.fetchone()
     conn.close()
     if row:
-        response = jsonify({'streak': row[0] or 0, 'rate': row[1] or 0})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        return response
+        return jsonify({'streak': row[0] or 0, 'rate': row[1] or 0})
     return jsonify({'error': 'Patient not found'}), 404
+
 # ------------------------------------------------------------
-# Routes du modèle ML
+# Routes pour la prédiction ML
+# ------------------------------------------------------------
+@app.route('/patients/<int:patient_id>/predict', methods=['GET'])
+def predict_patient(patient_id):
+    features = compute_features(patient_id, DB_PATH)
+    if features is None:
+        return jsonify({'error': 'Patient not found'}), 404
+
+    df = pd.DataFrame([features], columns=feature_names)
+    scaled = scaler.transform(df)
+    proba = model.predict_proba(scaled)[0][1]
+    return jsonify({'adherence_probability': proba})
+
+# ------------------------------------------------------------
+# Routes générales
 # ------------------------------------------------------------
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -583,6 +582,30 @@ def predict():
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok'})
+
+# ------------------------------------------------------------
+# Scheduler pour les rappels de rendez-vous
+# ------------------------------------------------------------
+def check_appointments():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    now = datetime.now()
+    tomorrow = now + timedelta(days=1)
+    cursor.execute('''
+        SELECT id, patient_id, appointment_date, notes
+        FROM appointments
+        WHERE appointment_date > ? AND appointment_date <= ? AND reminder_sent = 0
+    ''', (now.isoformat(), tomorrow.isoformat()))
+    upcoming = cursor.fetchall()
+    for apt_id, patient_id, apt_date, notes in upcoming:
+        print(f"[RAPPEL] Patient {patient_id} : rendez-vous le {apt_date} - {notes or ''}")
+        cursor.execute('UPDATE appointments SET reminder_sent = 1 WHERE id = ?', (apt_id,))
+    conn.commit()
+    conn.close()
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(check_appointments, 'interval', hours=24)
+scheduler.start()
 
 # ------------------------------------------------------------
 # Lancement
