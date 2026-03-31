@@ -6,13 +6,21 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import AddTreatment from './components/AddTreatment';
 import './App.css';
-
+import { Button } from './components/ui/button';
 function App() {
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('user');
     return stored ? JSON.parse(stored) : null;
   });
+  
 
+  function App() {
+    return (
+      <div className="p-4">
+        <Button>Cliquez</Button>
+      </div>
+    );
+  }
   return (
     <BrowserRouter>
       <Routes>

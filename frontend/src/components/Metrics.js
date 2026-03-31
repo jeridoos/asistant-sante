@@ -1,32 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 const Metrics = ({ patientId }) => {
   const [streak, setStreak] = useState(0);
   const [rate, setRate] = useState(0);
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async () => {
     try {
-      // Vous pouvez créer une route dédiée, ou lire depuis les données du patient
       const res = await fetch(`http://localhost:5000/patients/${patientId}/metrics`);
-      if (res.ok) {
-        const data = await res.json();
-        setStreak(data.streak);
-        setRate(data.rate);
-      }
+      const data = await res.json();
+      setStreak(data.streak);
+      setRate(data.rate);
     } catch (error) {
-      console.error(error);
+      console.error('Erreur chargement métriques:', error);
     }
-  };
+  }, [patientId]);
 
   useEffect(() => {
     fetchMetrics();
-  }, [patientId]);
+  }, [fetchMetrics]);
 
   return (
-    <div>
-      <h3>Observance</h3>
-      <p>Streak : {streak} jours consécutifs</p>
-      <p>Taux d'observance (7 jours) : {(rate * 100).toFixed(1)}%</p>
+    <div className="grid grid-cols-2 gap-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-gray-500">Streak</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{streak}</div>
+          <p className="text-xs text-gray-500">jours consécutifs</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-gray-500">Taux d'observance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{(rate * 100).toFixed(1)}%</div>
+          <p className="text-xs text-gray-500">sur les 7 derniers jours</p>
+        </CardContent>
+      </Card>
     </div>
   );
 };

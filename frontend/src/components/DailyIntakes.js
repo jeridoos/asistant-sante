@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Button } from './ui/button';
 
 const DailyIntakes = ({ patientId }) => {
   const [intakes, setIntakes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(null);
 
-  useEffect(() => {
-    fetchIntakes();
-  }, [patientId]);
-
-  const fetchIntakes = async () => {
+  // Utiliser useCallback pour mémoriser la fonction et éviter des appels infinis
+  const fetchIntakes = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await fetch(`http://localhost:5000/intakes?patient_id=${patientId}`);
       const data = await res.json();
@@ -19,7 +18,11 @@ const DailyIntakes = ({ patientId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [patientId]);
+
+  useEffect(() => {
+    fetchIntakes();
+  }, [fetchIntakes]); // fetchIntakes est stable grâce à useCallback
 
   const confirmIntake = async (intakeId) => {
     setConfirming(intakeId);
@@ -30,7 +33,7 @@ const DailyIntakes = ({ patientId }) => {
         body: JSON.stringify({ confirmed_datetime: new Date().toISOString() })
       });
       if (res.ok) {
-        await fetchIntakes();
+        await fetchIntakes(); // recharger la liste après confirmation
       } else {
         const err = await res.json();
         alert(`Erreur: ${err.error}`);
@@ -42,25 +45,34 @@ const DailyIntakes = ({ patientId }) => {
     }
   };
 
-  if (loading) return <div>Chargement des prises...</div>;
+  if (loading) {
+    return <div className="flex justify-center py-4">Chargement des prises...</div>;
+  }
 
   return (
     <div>
-      <h3>Prises du jour</h3>
       {intakes.length === 0 ? (
-        <p>Aucune prise programmée aujourd'hui.</p>
+        <p className="text-gray-500 text-center py-4">Aucune prise programmée aujourd'hui.</p>
       ) : (
-        <ul>
+        <ul className="divide-y divide-gray-200">
           {intakes.map(intake => (
-            <li key={intake.id}>
-              {intake.scheduled_datetime} - {intake.status}
+            <li key={intake.id} className="py-3 flex justify-between items-center">
+              <span className="text-gray-800">
+                {new Date(intake.scheduled_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {' '}
+                <span className="text-sm text-gray-500 ml-2">
+                  {intake.status === 'scheduled' ? 'En attente' : intake.status}
+                </span>
+              </span>
               {intake.status === 'scheduled' && (
-                <button
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => confirmIntake(intake.id)}
                   disabled={confirming === intake.id}
                 >
                   {confirming === intake.id ? 'Confirmation...' : 'Confirmer'}
-                </button>
+                </Button>
               )}
             </li>
           ))}
