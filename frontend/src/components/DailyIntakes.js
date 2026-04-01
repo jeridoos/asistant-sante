@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from './ui/button';
+import { useNotification } from '../context/NotificationContext';
+import ConfirmationFlip from './ConfirmationFlip';
 
 const DailyIntakes = ({ patientId }) => {
+  const { showNotification } = useNotification();
   const [intakes, setIntakes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(null);
 
-  // Utiliser useCallback pour mémoriser la fonction et éviter des appels infinis
   const fetchIntakes = useCallback(async () => {
     setLoading(true);
     try {
@@ -15,14 +16,15 @@ const DailyIntakes = ({ patientId }) => {
       setIntakes(data);
     } catch (error) {
       console.error('Erreur chargement prises:', error);
+      showNotification('Erreur', 'Impossible de charger les prises', 'error');
     } finally {
       setLoading(false);
     }
-  }, [patientId]);
+  }, [patientId, showNotification]);
 
   useEffect(() => {
     fetchIntakes();
-  }, [fetchIntakes]); // fetchIntakes est stable grâce à useCallback
+  }, [fetchIntakes]);
 
   const confirmIntake = async (intakeId) => {
     setConfirming(intakeId);
@@ -32,14 +34,24 @@ const DailyIntakes = ({ patientId }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirmed_datetime: new Date().toISOString() })
       });
+      
       if (res.ok) {
-        await fetchIntakes(); // recharger la liste après confirmation
+        const data = await res.json();
+        const delay = data.delay;
+        const delayMessage = delay > 0 ? ` (${Math.round(delay)} min de retard)` : '';
+        showNotification(
+          'Prise confirmée', 
+          `Médicament pris avec succès${delayMessage}`,
+          delay > 0 ? 'warning' : 'success'
+        );
+        await fetchIntakes();
       } else {
         const err = await res.json();
-        alert(`Erreur: ${err.error}`);
+        showNotification('Erreur', err.error || 'Impossible de confirmer la prise', 'error');
       }
     } catch (error) {
       console.error('Erreur confirmation:', error);
+      showNotification('Erreur réseau', 'Impossible de confirmer la prise', 'error');
     } finally {
       setConfirming(null);
     }
@@ -58,21 +70,23 @@ const DailyIntakes = ({ patientId }) => {
           {intakes.map(intake => (
             <li key={intake.id} className="py-3 flex justify-between items-center">
               <span className="text-gray-800">
-                {new Date(intake.scheduled_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {new Date(intake.scheduled_datetime).toLocaleTimeString([], { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
                 {' '}
                 <span className="text-sm text-gray-500 ml-2">
                   {intake.status === 'scheduled' ? 'En attente' : intake.status}
                 </span>
               </span>
               {intake.status === 'scheduled' && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => confirmIntake(intake.id)}
+                <ConfirmationFlip
+                  checked={false}
+                  onChange={(isChecked) => {
+                    if (isChecked) confirmIntake(intake.id);
+                  }}
                   disabled={confirming === intake.id}
-                >
-                  {confirming === intake.id ? 'Confirmation...' : 'Confirmer'}
-                </Button>
+                />
               )}
             </li>
           ))}

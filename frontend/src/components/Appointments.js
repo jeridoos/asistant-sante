@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { useNotification } from '../context/NotificationContext';
 
 const Appointments = ({ patientId }) => {
+  const { showNotification } = useNotification();
   const [appointments, setAppointments] = useState([]);
   const [date, setDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -25,6 +27,12 @@ const Appointments = ({ patientId }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!date) {
+      showNotification('Champ manquant', 'Veuillez sélectionner une date', 'warning');
+      return;
+    }
+
+    setLoading(true);
     try {
       const res = await fetch('http://localhost:5000/appointments', {
         method: 'POST',
@@ -35,17 +43,24 @@ const Appointments = ({ patientId }) => {
           notes: notes
         })
       });
+      const data = await res.json();
       if (res.ok) {
-        setMessage('Rendez-vous ajouté');
+        showNotification(
+          'Rendez-vous ajouté', 
+          `Le ${new Date(date).toLocaleString()}${notes ? ` - ${notes}` : ''}`,
+          'success'
+        );
         setDate('');
         setNotes('');
         fetchAppointments();
       } else {
-        const err = await res.json();
-        setMessage(`Erreur: ${err.error}`);
+        showNotification('Erreur', data.error || 'Impossible d\'ajouter le rendez-vous', 'error');
       }
     } catch (error) {
-      setMessage('Erreur réseau');
+      console.error('Erreur ajout rendez-vous:', error);
+      showNotification('Erreur réseau', 'Impossible de contacter le serveur', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -69,13 +84,10 @@ const Appointments = ({ patientId }) => {
               value={notes}
               onChange={e => setNotes(e.target.value)}
             />
-            <Button type="submit" className="w-full">Ajouter</Button>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Ajout en cours...' : 'Ajouter'}
+            </Button>
           </form>
-          {message && (
-            <div className={`mt-2 p-2 rounded text-sm ${message.includes('ajouté') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-              {message}
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -88,14 +100,28 @@ const Appointments = ({ patientId }) => {
             <ul className="space-y-2">
               {appointments.map(apt => (
                 <li key={apt.id} className="border-b pb-2 last:border-0">
-                  <div className="font-medium">{new Date(apt.appointment_date).toLocaleString()}</div>
-                  {apt.notes && <div className="text-sm text-gray-500">{apt.notes}</div>}
-                  {apt.reminder_sent && (
+                  <div className="font-medium">
+                    {new Date(apt.appointment_date).toLocaleString()}
+                  </div>
+                  {apt.notes && (
+                    <div className="text-sm text-gray-500">{apt.notes}</div>
+                  )}
+                  {apt.reminder_sent ? (
                     <span className="text-xs text-green-600">Rappel envoyé</span>
+                  ) : (
+                    <span className="text-xs text-gray-400">Rappel non encore envoyé</span>
                   )}
                 </li>
               ))}
             </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {appointments.length === 0 && (
+        <Card>
+          <CardContent className="p-4 text-center text-gray-500">
+            Aucun rendez-vous programmé
           </CardContent>
         </Card>
       )}

@@ -1,3 +1,534 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --secondary-color: #6b7280;
+  --danger-color: #ef4444;
+  --border-radius: 0.5rem;
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+
+  /* Neumorphic light theme variables */
+  --neumorph-bg: #e0e0e0;
+  --neumorph-shadow-dark: #bebebe;
+  --neumorph-shadow-light: #ffffff;
+}
+
+.dark {
+  /* Neumorphic dark theme variables */
+  --neumorph-bg: #2e2e2e;
+  --neumorph-shadow-dark: #1a1a1a;
+  --neumorph-shadow-light: #4a4a4a;
+}
+
+/* Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animation utility classes */
+.animate-fadeIn {
+  animation: fadeIn 0.6s ease-out;
+}
+.animate-slideUp {
+  animation: slideUp 0.6s ease-out;
+}
+
+/* 3D flip helpers */
+.backface-hidden {
+  backface-visibility: hidden;
+}
+.rotate-y-0 {
+  transform: rotateY(0deg);
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+/* ------------------------------------------------------------
+   Flip confirmation button
+------------------------------------------------------------ */
+.checkbox-container .checkbox {
+  display: none;
+}
+.checkbox-container .checkbox-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.checkbox-container .checkbox-flip {
+  width: 60px;
+  height: 60px;
+  perspective: 1000px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  transition: transform 0.4s ease;
+}
+.checkbox-container .checkbox-front,
+.checkbox-container .checkbox-back {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 12px;
+  backface-visibility: hidden;
+  transition: transform 0.3s ease;
+}
+.checkbox-container .checkbox-front {
+  transform: rotateY(0deg);
+}
+.checkbox-container .checkbox-back {
+  transform: rotateY(180deg);
+}
+.checkbox-container .checkbox-wrapper:hover .checkbox-flip {
+  transform: scale(1.1);
+  transition: transform 0.4s ease-out;
+}
+.checkbox-container .checkbox:checked + .checkbox-label .checkbox-front {
+  transform: rotateY(180deg);
+}
+.checkbox-container .checkbox:checked + .checkbox-label .checkbox-back {
+  transform: rotateY(0deg);
+}
+.checkbox-container .checkbox:focus + .checkbox-label .checkbox-flip {
+  box-shadow: 0 0 15px rgba(54, 181, 73, 0.7), 0 0 20px rgba(0, 193, 212, 0.4);
+  transition: box-shadow 0.3s ease;
+}
+
+/* ------------------------------------------------------------
+   Login / Register form (classic style)
+------------------------------------------------------------ */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: #ffffff;
+  padding: 30px;
+  width: 450px;
+  border-radius: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+::placeholder {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.form button {
+  align-self: flex-end;
+}
+
+.flex-column > label {
+  color: #151717;
+  font-weight: 600;
+}
+
+.inputForm {
+  border: 1.5px solid #ecedec;
+  border-radius: 10px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  transition: 0.2s ease-in-out;
+}
+
+.input {
+  margin-left: 10px;
+  border-radius: 10px;
+  border: none;
+  width: 85%;
+  height: 100%;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.inputForm:focus-within {
+  border: 1.5px solid #2d79f3;
+}
+
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.flex-row > div > label {
+  font-size: 14px;
+  color: black;
+  font-weight: 400;
+}
+
+.span {
+  font-size: 14px;
+  margin-left: 5px;
+  color: #2d79f3;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.button-submit {
+  margin: 20px 0 10px 0;
+  background-color: #151717;
+  border: none;
+  color: white;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 10px;
+  height: 50px;
+  width: 100%;
+  cursor: pointer;
+}
+.button-submit:hover {
+  background-color: #252727;
+}
+
+.p {
+  text-align: center;
+  color: black;
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+.btn {
+  margin-top: 10px;
+  width: 100%;
+  height: 50px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 500;
+  gap: 10px;
+  border: 1px solid #ededef;
+  background-color: white;
+  cursor: pointer;
+  transition: 0.2s ease-in-out;
+}
+.btn:hover {
+  border: 1px solid #2d79f3;
+}
+
+/* ------------------------------------------------------------
+   Neumorphic card (universal)
+------------------------------------------------------------ */
+.card-neumorph {
+  background: var(--neumorph-bg);
+  border-radius: 30px;
+  box-shadow: 15px 15px 30px var(--neumorph-shadow-dark),
+              -15px -15px 30px var(--neumorph-shadow-light);
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  color: #111827; /* fallback light mode */
+}
+.card-neumorph:hover {
+  box-shadow: 8px 8px 16px var(--neumorph-shadow-dark),
+              -8px -8px 16px var(--neumorph-shadow-light);
+}
+
+.dark .card-neumorph {
+  color: #f9fafb;
+}
+
+/* Force text inside neumorphic card to inherit color (for children) */
+.card-neumorph h2,
+.card-neumorph p,
+.card-neumorph span,
+.card-neumorph div:not(.no-inherit) {
+  color: inherit;
+}
+
+/* ------------------------------------------------------------
+   Global background – let pages control it, but ensure html/body
+   don't interfere (transparent by default)
+------------------------------------------------------------ */
+html, body {
+  background-color: transparent;
+}
+
+/* Modern card style inspired by George Francis */
+.modern-card {
+  --border-radius: 0.75rem;
+  --primary-color: #7257fa;
+  --secondary-color: #3c3852;
+  width: 100%;
+  font-family: "Arial", sans-serif;
+  padding: 1rem;
+  cursor: pointer;
+  border-radius: var(--border-radius);
+  background: #f1f1f3;
+  box-shadow: 0px 8px 16px 0px rgb(0 0 0 / 3%);
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.modern-card > * + * {
+  margin-top: 1.1em;
+}
+
+.modern-card .card__content {
+  color: var(--secondary-color);
+  font-size: 0.86rem;
+}
+
+.modern-card .card__title {
+  padding: 0;
+  font-size: 1.3rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+.modern-card .card__date {
+  color: #6e6b80;
+  font-size: 0.8rem;
+}
+
+.modern-card .card__arrow {
+  position: absolute;
+  background: var(--primary-color);
+  padding: 0.4rem;
+  border-top-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
+  bottom: 0;
+  right: 0;
+  transition: 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modern-card svg {
+  transition: 0.2s;
+}
+
+.modern-card:hover .card__title {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+.modern-card:hover .card__arrow {
+  background: #111;
+}
+
+.modern-card:hover .card__arrow svg {
+  transform: translateX(3px);
+}
+/* Modern Card */
+.card {
+  --border-radius: 0.75rem;
+  --primary-color: #7257fa;
+  --secondary-color: #3c3852;
+  width: 100%;
+  font-family: "Arial";
+  padding: 1rem;
+  cursor: pointer;
+  border-radius: var(--border-radius);
+  background: #f1f1f3;
+  box-shadow: 0px 8px 16px 0px rgb(0 0 0 / 3%);
+  position: relative;
+  transition: all 0.2s ease;
+}
+.dark .card {
+  background: #1e1e2a;
+  --primary-color: #8b74ff;
+  --secondary-color: #a5a1c2;
+}
+.card > * + * {
+  margin-top: 1.1em;
+}
+.card .card__content {
+  color: var(--secondary-color);
+  font-size: 0.86rem;
+}
+.card .card__title {
+  padding: 0;
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #111;
+}
+.dark .card .card__title {
+  color: #eee;
+}
+.card .card__date {
+  color: #6e6b80;
+  font-size: 0.8rem;
+}
+.dark .card .card__date {
+  color: #9a97b0;
+}
+.card .card__arrow {
+  position: absolute;
+  background: var(--primary-color);
+  padding: 0.4rem;
+  border-top-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
+  bottom: 0;
+  right: 0;
+  transition: 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.card svg {
+  transition: 0.2s;
+}
+.card:hover .card__title {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+.card:hover .card__arrow {
+  background: #111;
+}
+.dark .card:hover .card__arrow {
+  background: #333;
+}
+.card:hover .card__arrow svg {
+  transform: translateX(3px);
+}
+
+/* Profile menu (modern dropdown) */
+.profile-menu-main {
+  font-weight: 800;
+  color: white;
+  background-color: darkviolet;
+  padding: 3px 15px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  height: 2.5rem;
+  width: 12rem;
+  position: relative;
+  cursor: pointer;
+  justify-content: space-between;
+}
+
+.profile-bar {
+  display: flex;
+  height: 50%;
+  width: 20px;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.profile-bar .bar-list {
+  --transform: -25%;
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: 50px;
+  background-color: white;
+  transition: all 0.4s;
+  position: relative;
+}
+
+.profile-menu-main .profile-inp {
+  display: none;
+}
+
+.profile-menu-main .profile-inp:checked ~ .profile-bar .top {
+  transform-origin: top right;
+  transform: translateY(var(--transform)) rotate(-45deg);
+}
+.profile-menu-main .profile-inp:checked ~ .profile-bar .middle {
+  transform: translateX(-50%);
+  opacity: 0;
+}
+.profile-menu-main .profile-inp:checked ~ .profile-bar .bottom {
+  transform-origin: bottom right;
+  transform: translateY(calc(var(--transform) * -1)) rotate(45deg);
+}
+
+.profile-menu-container {
+  background-color: white;
+  color: darkviolet;
+  border-radius: 10px;
+  position: absolute;
+  width: 100%;
+  left: 0;
+  top: 130%;
+  overflow: hidden;
+  transition: all 0.4s;
+  clip-path: inset(0% 0% 0% 0% round 10px);
+  z-index: 50;
+}
+.profile-inp:not(:checked) ~ .profile-menu-container {
+  clip-path: inset(10% 50% 90% 50% round 10px);
+  pointer-events: none;
+}
+
+.menu-list {
+  --delay: 0.4s;
+  --trdelay: 0.15s;
+  padding: 8px 10px;
+  border-radius: inherit;
+  transition: background-color 0.2s 0s;
+  position: relative;
+  cursor: pointer;
+  transform: translateY(30px);
+  opacity: 0;
+}
+.profile-inp:checked ~ .profile-menu-container .menu-list {
+  transform: translateY(0);
+  opacity: 1;
+}
+.profile-inp:checked ~ .profile-menu-container .menu-list:nth-child(1) {
+  transition: transform 0.4s var(--delay), opacity 0.4s var(--delay);
+}
+.profile-inp:checked ~ .profile-menu-container .menu-list:nth-child(2) {
+  transition: transform 0.4s calc(var(--delay) + (var(--trdelay) * 1)), opacity 0.4s calc(var(--delay) + (var(--trdelay) * 1));
+}
+.profile-inp:checked ~ .profile-menu-container .menu-list:nth-child(3) {
+  transition: transform 0.4s calc(var(--delay) + (var(--trdelay) * 2)), opacity 0.4s calc(var(--delay) + (var(--trdelay) * 2));
+}
+.menu-list::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 1px;
+  background-color: rgba(0, 0, 0, 0.3);
+  width: 95%;
+}
+.menu-list:last-child::after {
+  display: none;
+}
+.menu-list:hover {
+  background-color: rgb(223, 223, 223);
+}
+
+.missing-badge {
+  background-color: red;
+  color: white;
+  border-radius: 50%;
+  padding: 0 0.4rem;
+  font-size: 0.7rem;
+  margin-left: 0.5rem;
+  display: inline-block;
+  line-height: 1.2rem;
+}
